@@ -1083,12 +1083,17 @@ function renderPagePanels() {
       const pt = S.fontSizes[fid] || parseFloat((parseFloat(cs.fontSize) * 0.75).toFixed(1));
       const shortName = fid.replace(/^(header-date|P\d_)/, '').replace(/_/g,' ') || '発行日';
       return `
-      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
         <span style="font-size:10px;color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shortName}</span>
         <input type="range" min="6" max="40" step="0.5" value="${pt}"
-          style="width:70px;accent-color:#a78bfa;cursor:pointer;height:14px"
-          oninput="onFieldFontSize('${fid}',this.value,this.nextElementSibling)">
-        <span style="font-size:9px;font-weight:700;color:#a78bfa;width:30px;text-align:right">${pt}pt</span>
+          style="width:60px;accent-color:#a78bfa;cursor:pointer;height:14px"
+          oninput="onFieldFontSize('${fid}',this.value);syncFontInput(this,'fsi-${fid}')">
+        <input id="fsi-${fid}" type="text" value="${pt}"
+          style="width:36px;background:#0a0f1a;border:1px solid #334155;border-radius:4px;color:#a78bfa;font-size:10px;font-weight:700;text-align:center;padding:2px 0;font-family:monospace"
+          onchange="onFontInputChange('${fid}',this)"
+          onkeydown="if(event.key==='Enter'){this.blur()}"
+          onfocus="this.select()">
+        <span style="font-size:8px;color:#475569">pt</span>
       </div>`;
     }).join('');
 
@@ -1116,17 +1121,42 @@ function renderPagePanels() {
   }).join('');
 }
 
-function onFieldFontSize(fid, val, labelEl) {
+function onFieldFontSize(fid, val) {
   const pt = parseFloat(val).toFixed(1);
-  if (labelEl) labelEl.textContent = pt + 'pt';
   const el = document.getElementById(fid);
   if (!el) return;
   szEl = el;
   onSzChange(parseFloat(pt));
-  // スライダーの値も同期（revertされた場合）
+  // revertされた場合、スライダーと入力欄を同期
   const actualPt = S.fontSizes[fid] || parseFloat(pt);
-  if (labelEl) labelEl.textContent = actualPt + 'pt';
-  if (labelEl && labelEl.previousElementSibling) labelEl.previousElementSibling.value = actualPt;
+  syncFontControls(fid, actualPt);
+}
+
+function onFontInputChange(fid, inputEl) {
+  const val = parseFloat(inputEl.value);
+  if (isNaN(val) || val < 4 || val > 60) {
+    // 不正な値 → 現在値に戻す
+    const cur = S.fontSizes[fid] || 9;
+    inputEl.value = cur;
+    return;
+  }
+  onFieldFontSize(fid, val);
+}
+
+function syncFontInput(rangeEl, inputId) {
+  const inp = document.getElementById(inputId);
+  if (inp) inp.value = rangeEl.value;
+}
+
+function syncFontControls(fid, pt) {
+  const inp = document.getElementById('fsi-' + fid);
+  if (inp) inp.value = pt;
+  // スライダーも同期（同じ行内のrangeを探す）
+  if (inp) {
+    const row = inp.closest('div');
+    const range = row?.querySelector('input[type=range]');
+    if (range) range.value = pt;
+  }
 }
 
 function onImgSize(slotId, val, labelEl) {
