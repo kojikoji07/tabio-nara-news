@@ -215,6 +215,13 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: #3b82f6; }
 }
 .page-half.overflow-warn { outline: 3px solid #dc2626; outline-offset: -3px; }
 
+/* Page number badge */
+.page-num {
+  position: absolute; bottom: 3mm; left: 50%; transform: translateX(-50%);
+  font-family: 'Noto Sans JP', sans-serif; font-size: 7pt; font-weight: 900;
+  color: #94a3b8; letter-spacing: .1em; z-index: 10;
+}
+
 .bdr-r { border-right: 1px dashed #cbd5e1; }
 
 .tag {
@@ -361,24 +368,8 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: #3b82f6; }
           </div>
         </div>
 
-        <!-- ③ 写真・サイズ調整 -->
-        <div class="acc">
-          <div class="acc-hd" data-acc="s3" onclick="toggleAcc(this)">
-            <span>🖼 ③　写真・サイズ調整</span>
-            <span class="acc-hd-icon">▼</span>
-          </div>
-          <div class="acc-bd" id="s3">
-            <p style="font-size:10px;color:#475569;margin-bottom:8px;line-height:1.6">
-              写真：「変更」ボタン、またはプレビュー上の写真エリアをクリック<br>
-              文字サイズ：プレビュー上の文字をクリック → スライダーで調整
-            </p>
-            <div id="img-list"><!-- populated --></div>
-            <div style="border-top:1px solid #1e293b;padding-top:9px;margin-top:5px">
-              <p style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">画像エリアの高さ</p>
-              <div id="img-size-controls"><!-- populated --></div>
-            </div>
-          </div>
-        </div>
+        <!-- ③ ページ別調整 -->
+        <div id="page-panels"><!-- populated by renderPagePanels() --></div>
 
       </div><!-- left-scroll -->
     </div><!-- left -->
@@ -464,6 +455,36 @@ const IMG_SIZES = [
   {cssVar:'--icon-size',       lbl:'顔写真（丸）のサイズ', min:9,  max:25, step:1, unit:'mm', def:14},
   {cssVar:'--oshikatsu-size',  lbl:'推し活写真のサイズ',   min:14, max:40, step:2, unit:'mm', def:24},
   {cssVar:'--p1-font-size',    lbl:'P1 タイトル文字サイズ', min:16, max:48, step:1, unit:'pt', def:28},
+];
+
+// ページ別マッピング（サイドバー用）
+const PAGE_MAP = [
+  { page: 'P1', label: 'P1 表紙',
+    imgs: ['nl-img-p1'],
+    fields: ['header-date','P1_タイトル','P1_サマリー1','P1_サマリー2','P1_サマリー3'],
+    cssVars: [{cssVar:'--p1-font-size', lbl:'タイトル文字サイズ', min:16, max:48, step:1, unit:'pt', def:28}],
+  },
+  { page: 'P2', label: 'P2 特集記事',
+    imgs: ['nl-img-p2m','nl-img-p2s'],
+    fields: ['P2_見出し','P2_仕事の肝','P2_BeforeAfter','P2_推し活'],
+    cssVars: [
+      {cssVar:'--p2-main-img-h', lbl:'メイン写真の高さ', min:25, max:80, step:2, unit:'mm', def:50},
+      {cssVar:'--p2-sub-img-h',  lbl:'サブ写真の高さ',   min:15, max:60, step:2, unit:'mm', def:35},
+    ],
+  },
+  { page: 'P3', label: 'P3 経営メッセージ',
+    imgs: ['nl-img-ochi','nl-img-masago'],
+    fields: ['P3_トピック1','P3_トピック2','P3_トピック3','P3_奈良社長_事実','P3_奈良社長_大事','P3_奈良社長_願い','P3_数字'],
+    cssVars: [{cssVar:'--icon-size', lbl:'顔写真（丸）のサイズ', min:9, max:25, step:1, unit:'mm', def:14}],
+  },
+  { page: 'P4', label: 'P4 フィロソフィー',
+    imgs: ['nl-img-found','nl-img-thx1','nl-img-thx2','nl-img-thx3','nl-img-oshi'],
+    fields: ['P4_創業者の言葉','P4_創業者の言葉の理解','P4_ありがとう1','P4_ありがとう2','P4_ありがとう3','P4_言いにくい','P4_編集後記','P4_予告'],
+    cssVars: [
+      {cssVar:'--p4-founder-img-h', lbl:'創業者写真の高さ', min:25, max:75, step:2, unit:'mm', def:45},
+      {cssVar:'--oshikatsu-size',    lbl:'推し活写真のサイズ', min:14, max:40, step:2, unit:'mm', def:24},
+    ],
+  },
 ];
 
 const DEFAULT_CONTENT = Object.fromEntries(FIELDS.map(f => [f, '']));
@@ -683,6 +704,7 @@ function nlHTML() {
           </div>
         </div>
       </div>
+      <div class="page-num">— 4 —</div>
     </div><!-- page4 end -->
 
     <!-- P1 Cover -->
@@ -722,6 +744,7 @@ function nlHTML() {
           </div>
         </div>
       </div>
+      <div class="page-num" style="color:white;text-shadow:0 1px 3px rgba(0,0,0,.5)">— 1 —</div>
     </div><!-- page1 end -->
 
   </div><!-- sheet1 end -->
@@ -755,6 +778,7 @@ function nlHTML() {
             style="font-size:8pt;padding:2.5mm;background:#fff5f5;border:1px solid #fecaca;border-radius:1mm;color:#991b1b;font-weight:700;line-height:1.7"></div>
         </div>
       </div>
+      <div class="page-num">— 2 —</div>
     </div><!-- page2 end -->
 
     <!-- P3 Management -->
@@ -803,6 +827,7 @@ function nlHTML() {
           contenteditable="true" onclick="showSzPop(this,event)"
           style="font-family:'Noto Sans JP',sans-serif;font-size:36pt;font-weight:900;letter-spacing:-.04em;font-style:italic;color:var(--color-main);line-height:1"></div>
       </div>
+      <div class="page-num">— 3 —</div>
     </div><!-- page3 end -->
 
   </div><!-- sheet2 end -->
@@ -817,8 +842,7 @@ function render() {
   attachNLListeners();
   applyAll();
   rescale();
-  renderImgList();
-  renderImgSizeControls();
+  renderPagePanels();
 }
 
 function applyAll() {
@@ -978,7 +1002,7 @@ document.getElementById('img-input').addEventListener('change', e => {
     const slot = document.getElementById(picTarget);
     if (slot) slot.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover">`;
     saveS();
-    renderImgList();
+    renderPagePanels();
   };
   reader.readAsDataURL(file);
 });
@@ -986,30 +1010,112 @@ document.getElementById('img-input').addEventListener('change', e => {
 /* ============================================================
    SIDEBAR: Image list & size sliders
    ============================================================ */
-function renderImgList() {
-  const list = document.getElementById('img-list');
-  list.innerHTML = IMG_SLOTS.map(s => {
-    const has = !!S.images[s.id];
-    const scale = S.imageSizes[s.id] || 100;
+/* ============================================================
+   PAGE PANELS (sidebar ③ — per-page)
+   ============================================================ */
+function renderPagePanels() {
+  const wrap = document.getElementById('page-panels');
+  if (!wrap) return;
+  wrap.innerHTML = PAGE_MAP.map((pm, idx) => {
+    const accId = 'sp' + pm.page;
+    const imgSlots = IMG_SLOTS.filter(s => pm.imgs.includes(s.id));
+    const fieldItems = pm.fields;
+
+    // 写真一覧
+    const imgHTML = imgSlots.map(s => {
+      const has = !!S.images[s.id];
+      const scale = S.imageSizes[s.id] || 100;
+      const shortLbl = s.lbl.replace(/^P\d\s*/, '');
+      return `
+      <div class="img-row" style="flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;width:100%">
+          ${has
+            ? `<img class="img-thumb" src="${S.images[s.id]}">`
+            : `<div class="img-placeholder"></div>`}
+          <span class="img-lbl">${shortLbl}</span>
+          <button class="btn-sm" onclick="pickImg('${s.id}')">変更</button>
+        </div>
+        ${has ? `
+        <div style="display:flex;align-items:center;gap:5px;width:100%;padding-top:4px">
+          <span style="font-size:9px;color:#475569;width:28px">大きさ</span>
+          <input type="range" min="40" max="150" step="5" value="${scale}"
+            style="flex:1;accent-color:#3b82f6;cursor:pointer;height:14px"
+            oninput="onImgSize('${s.id}',this.value,this.nextElementSibling)">
+          <span style="font-size:9px;font-weight:700;color:#60a5fa;width:30px;text-align:right">${scale}%</span>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+
+    // CSS変数スライダー（画像エリア高さ等）
+    const cssHTML = pm.cssVars.map(cfg => {
+      const curRaw = S.cssVars[cfg.cssVar] || cfg.def + cfg.unit;
+      const cur = parseFloat(curRaw);
+      return `
+      <div style="margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+          <span style="font-size:10px;color:#64748b">${cfg.lbl}</span>
+          <span id="sv-${cfg.cssVar.slice(2)}" style="font-size:9px;font-weight:700;color:#60a5fa">${cur}${cfg.unit}</span>
+        </div>
+        <input type="range" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}" value="${cur}"
+          style="width:100%;accent-color:#3b82f6;cursor:pointer"
+          oninput="onCssVar('${cfg.cssVar}','${cfg.unit}',this.value,'sv-${cfg.cssVar.slice(2)}')">
+      </div>`;
+    }).join('');
+
+    // フォントサイズ一覧（このページのフィールド）
+    const fontHTML = fieldItems.map(fid => {
+      const el = document.getElementById(fid);
+      if (!el) return '';
+      const cs = window.getComputedStyle(el);
+      const pt = S.fontSizes[fid] || parseFloat((parseFloat(cs.fontSize) * 0.75).toFixed(1));
+      const shortName = fid.replace(/^(header-date|P\d_)/, '').replace(/_/g,' ') || '発行日';
+      return `
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <span style="font-size:10px;color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${shortName}</span>
+        <input type="range" min="6" max="40" step="0.5" value="${pt}"
+          style="width:70px;accent-color:#a78bfa;cursor:pointer;height:14px"
+          oninput="onFieldFontSize('${fid}',this.value,this.nextElementSibling)">
+        <span style="font-size:9px;font-weight:700;color:#a78bfa;width:30px;text-align:right">${pt}pt</span>
+      </div>`;
+    }).join('');
+
     return `
-    <div class="img-row" style="flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:8px;width:100%">
-        ${has
-          ? `<img class="img-thumb" src="${S.images[s.id]}">`
-          : `<div class="img-placeholder"></div>`}
-        <span class="img-lbl">${s.lbl}</span>
-        <button class="btn-sm" onclick="pickImg('${s.id}')">変更</button>
+    <div class="acc">
+      <div class="acc-hd" data-acc="${accId}" onclick="toggleAcc(this)">
+        <span>📄 ③　${pm.label}</span>
+        <span class="acc-hd-icon">▼</span>
       </div>
-      ${has ? `
-      <div style="display:flex;align-items:center;gap:5px;width:100%;padding-top:4px">
-        <span style="font-size:9px;color:#475569;width:28px">大きさ</span>
-        <input type="range" min="40" max="150" step="5" value="${scale}"
-          style="flex:1;accent-color:#3b82f6;cursor:pointer;height:14px"
-          oninput="onImgSize('${s.id}',this.value,this.nextElementSibling)">
-        <span style="font-size:9px;font-weight:700;color:#60a5fa;width:30px;text-align:right">${scale}%</span>
-      </div>` : ''}
+      <div class="acc-bd" id="${accId}">
+        ${imgSlots.length ? `
+        <p style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">📷 写真</p>
+        ${imgHTML}` : ''}
+        ${cssHTML ? `
+        <div style="border-top:1px solid #1e293b;padding-top:7px;margin-top:5px">
+          <p style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">↕ サイズ調整</p>
+          ${cssHTML}
+        </div>` : ''}
+        <div style="border-top:1px solid #1e293b;padding-top:7px;margin-top:5px">
+          <p style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">🔤 文字サイズ</p>
+          ${fontHTML}
+        </div>
+      </div>
     </div>`;
   }).join('');
+}
+
+function onFieldFontSize(fid, val, labelEl) {
+  const pt = parseFloat(val).toFixed(1);
+  if (labelEl) labelEl.textContent = pt + 'pt';
+  const el = document.getElementById(fid);
+  if (!el) return;
+  // overflow チェック付きで適用
+  szEl = el;
+  if (!lastGoodSz[fid]) lastGoodSz[fid] = S.fontSizes[fid] || parseFloat((parseFloat(window.getComputedStyle(el).fontSize) * 0.75).toFixed(1));
+  onSzChange(parseFloat(pt));
+  // スライダーの値も同期（revertされた場合）
+  const actualPt = S.fontSizes[fid] || parseFloat(pt);
+  if (labelEl) labelEl.textContent = actualPt + 'pt';
+  if (labelEl && labelEl.previousElementSibling) labelEl.previousElementSibling.value = actualPt;
 }
 
 function onImgSize(slotId, val, labelEl) {
@@ -1029,16 +1135,11 @@ function applyImageSizes() {
 function applyOneImageSize(id, pct) {
   const slot = document.getElementById(id);
   if (!slot) return;
-  // 実際の高さと幅を pct% でスケール（レイアウトに影響させる）
   const cs = window.getComputedStyle(slot);
-  // CSSで指定された元のサイズをベースに計算
-  // height が CSS変数等で指定されている場合はそのまま使う
-  // scale ではなく直接 height を変更する
   if (pct === 100) {
     slot.style.removeProperty('height');
     slot.style.removeProperty('width');
   } else {
-    // 元のサイズを取得（初回のみ記録）
     if (!slot.dataset.origH) {
       slot.dataset.origH = cs.height;
       slot.dataset.origW = cs.width;
@@ -1046,29 +1147,10 @@ function applyOneImageSize(id, pct) {
     const origH = parseFloat(slot.dataset.origH);
     const origW = parseFloat(slot.dataset.origW);
     slot.style.height = (origH * pct / 100) + 'px';
-    // 丸型の場合は幅も変更
     if (slot.classList.contains('nl-round') || slot.style.aspectRatio) {
       slot.style.width = (origW * pct / 100) + 'px';
     }
   }
-}
-
-function renderImgSizeControls() {
-  const wrap = document.getElementById('img-size-controls');
-  wrap.innerHTML = IMG_SIZES.map(cfg => {
-    const curRaw = S.cssVars[cfg.cssVar] || cfg.def + cfg.unit;
-    const cur = parseFloat(curRaw);
-    return `
-    <div style="margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-        <span style="font-size:10px;color:#64748b">${cfg.lbl}</span>
-        <span id="sv-${cfg.cssVar.slice(2)}" style="font-size:9px;font-weight:700;color:#60a5fa">${cur}${cfg.unit}</span>
-      </div>
-      <input type="range" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}" value="${cur}"
-        style="width:100%;accent-color:#3b82f6;cursor:pointer"
-        oninput="onCssVar('${cfg.cssVar}','${cfg.unit}',this.value,'sv-${cfg.cssVar.slice(2)}')">
-    </div>`;
-  }).join('');
 }
 
 function onCssVar(cssVar, unit, val, labelId) {
