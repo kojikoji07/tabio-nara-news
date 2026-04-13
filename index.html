@@ -1405,6 +1405,15 @@ function closePdfGuide() {
 function init() {
   loadS();
 
+  // URLパラメータからAPIキーを取得（?key=xxx）
+  const urlKey = new URLSearchParams(window.location.search).get('key');
+  if (urlKey) {
+    localStorage.setItem(AKEY, urlKey);
+    // URLからkeyパラメータを消す（履歴に残さない）
+    const clean = window.location.pathname + window.location.hash;
+    window.history.replaceState(null, '', clean);
+  }
+
   // API key modal
   const apiKey = localStorage.getItem(AKEY);
   if (!apiKey) {
