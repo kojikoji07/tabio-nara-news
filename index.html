@@ -905,25 +905,47 @@ function showSzPop(el, e) {
   pop.classList.add('vis');
 }
 
+let lastGoodSz = {};  // { elementId: pt } — overflow前の最後のサイズ
+
 function onSzChange(v) {
   const pt = parseFloat(v).toFixed(1);
   document.getElementById('sz-val').textContent = pt + 'pt';
-  if (szEl) {
-    szEl.style.fontSize = pt + 'pt';
-    S.fontSizes[szEl.id] = parseFloat(pt);
-    saveS();
-    checkOverflow(szEl);
-  }
-}
+  if (!szEl) return;
 
-function checkOverflow(el) {
-  document.querySelectorAll('.page-half.overflow-warn').forEach(p => p.classList.remove('overflow-warn'));
-  const page = el.closest('.page-half');
-  if (!page) return;
-  if (page.scrollHeight > page.clientHeight + 2) {
-    page.classList.add('overflow-warn');
-    setStatus('err', '用紙からはみ出しています。文字サイズを小さくしてください');
+  // 変更前のサイズを記録
+  const prevPt = S.fontSizes[szEl.id] || parseFloat((parseFloat(window.getComputedStyle(szEl).fontSize) * 0.75).toFixed(1));
+  if (!lastGoodSz[szEl.id]) lastGoodSz[szEl.id] = prevPt;
+
+  szEl.style.fontSize = pt + 'pt';
+
+  const page = szEl.closest('.page-half');
+  // overflow検出
+  let overflowing = false;
+  if (page) {
+    // 通常フロー：scrollHeight チェック
+    if (page.scrollHeight > page.clientHeight + 2) overflowing = true;
+    // 絶対配置内の要素：要素自身がページ境界を超えていないかチェック
+    const pageRect = page.getBoundingClientRect();
+    const elRect = szEl.getBoundingClientRect();
+    if (elRect.bottom > pageRect.bottom + 2 || elRect.top < pageRect.top - 2) overflowing = true;
   }
+  if (overflowing) {
+    // はみ出した → 前の安全なサイズに戻す
+    const safePt = lastGoodSz[szEl.id];
+    szEl.style.fontSize = safePt + 'pt';
+    document.getElementById('sz-range').value = safePt;
+    document.getElementById('sz-val').textContent = safePt + 'pt';
+    S.fontSizes[szEl.id] = safePt;
+    setStatus('err', 'これ以上大きくすると用紙からはみ出します');
+    saveS();
+    return;
+  }
+
+  // 問題なし → 保存
+  document.querySelectorAll('.page-half.overflow-warn').forEach(p => p.classList.remove('overflow-warn'));
+  lastGoodSz[szEl.id] = parseFloat(pt);
+  S.fontSizes[szEl.id] = parseFloat(pt);
+  saveS();
 }
 
 function closeSzPop() {
@@ -994,18 +1016,41 @@ function onImgSize(slotId, val, labelEl) {
   const pct = parseInt(val);
   if (labelEl) labelEl.textContent = pct + '%';
   S.imageSizes[slotId] = pct;
-  applyImageSizes();
+  applyOneImageSize(slotId, pct);
   saveS();
 }
 
 function applyImageSizes() {
   Object.keys(S.imageSizes).forEach(id => {
-    const slot = document.getElementById(id);
-    if (!slot) return;
-    const pct = S.imageSizes[id] || 100;
-    slot.style.transform = `scale(${pct / 100})`;
-    slot.style.transformOrigin = 'center center';
+    applyOneImageSize(id, S.imageSizes[id] || 100);
   });
+}
+
+function applyOneImageSize(id, pct) {
+  const slot = document.getElementById(id);
+  if (!slot) return;
+  // 実際の高さと幅を pct% でスケール（レイアウトに影響させる）
+  const cs = window.getComputedStyle(slot);
+  // CSSで指定された元のサイズをベースに計算
+  // height が CSS変数等で指定されている場合はそのまま使う
+  // scale ではなく直接 height を変更する
+  if (pct === 100) {
+    slot.style.removeProperty('height');
+    slot.style.removeProperty('width');
+  } else {
+    // 元のサイズを取得（初回のみ記録）
+    if (!slot.dataset.origH) {
+      slot.dataset.origH = cs.height;
+      slot.dataset.origW = cs.width;
+    }
+    const origH = parseFloat(slot.dataset.origH);
+    const origW = parseFloat(slot.dataset.origW);
+    slot.style.height = (origH * pct / 100) + 'px';
+    // 丸型の場合は幅も変更
+    if (slot.classList.contains('nl-round') || slot.style.aspectRatio) {
+      slot.style.width = (origW * pct / 100) + 'px';
+    }
+  }
 }
 
 function renderImgSizeControls() {
