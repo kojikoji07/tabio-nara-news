@@ -170,7 +170,8 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: #3b82f6; }
   position: fixed; inset: 0; background: rgba(0,0,0,.78); z-index: 800;
   display: flex; align-items: center; justify-content: center;
 }
-#modal.hidden { display: none; }
+#modal.hidden, #pdf-guide.hidden { display: none; }
+#pdf-guide:not(.hidden) { display: flex; }
 #modal-box { background: #0f172a; border-radius: 14px; padding: 30px; width: 420px; border: 1px solid #1e293b; }
 #modal-box h2 { font-size: 17px; font-weight: 900; margin-bottom: 7px; }
 #modal-box p { font-size: 12px; color: #64748b; margin-bottom: 16px; line-height: 1.6; }
@@ -212,6 +213,7 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: #3b82f6; }
   padding: 11mm 17mm; box-sizing: border-box;
   position: relative; display: flex; flex-direction: column; overflow: hidden;
 }
+.page-half.overflow-warn { outline: 3px solid #dc2626; outline-offset: -3px; }
 
 .bdr-r { border-right: 1px dashed #cbd5e1; }
 
@@ -256,7 +258,7 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: #3b82f6; }
 /* Print */
 @media print {
   html, body { overflow: visible !important; height: auto !important; }
-  #hdr, #left, #sz-pop, #modal { display: none !important; }
+  #hdr, #left, #sz-pop, #modal, #pdf-guide { display: none !important; }
   #body { display: block !important; overflow: visible !important; }
   #right { padding: 0 !important; background: none !important; overflow: visible !important; }
   #preview-wrap { zoom: 1 !important; transform: none !important; display: block !important; }
@@ -389,6 +391,20 @@ textarea:focus, input[type=text]:focus { outline: none; border-color: #3b82f6; }
   </div><!-- body -->
 </div><!-- root -->
 
+<!-- PDF Guide overlay -->
+<div id="pdf-guide" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:900;align-items:center;justify-content:center">
+  <div style="background:#0f172a;border-radius:14px;padding:30px;max-width:480px;border:1px solid #3b82f6;color:#e2e8f0">
+    <h2 style="font-size:17px;font-weight:900;margin-bottom:14px">PDF保存の手順</h2>
+    <div style="font-size:13px;line-height:2;color:#cbd5e1">
+      <div style="margin-bottom:8px"><span style="background:#3b82f6;color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-right:6px">1</span> 送信先を <strong style="color:#4ade80">「PDFに保存」</strong> に変更</div>
+      <div style="margin-bottom:8px"><span style="background:#3b82f6;color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-right:6px">2</span> 用紙サイズを <strong style="color:#4ade80">「A3」</strong> に設定</div>
+      <div style="margin-bottom:8px"><span style="background:#3b82f6;color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-right:6px">3</span> 余白を <strong style="color:#4ade80">「なし」</strong> に設定</div>
+      <div><span style="background:#3b82f6;color:white;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-right:6px">4</span> <strong style="color:#4ade80">「保存」</strong> をクリック</div>
+    </div>
+    <button onclick="closePdfGuide()" style="width:100%;margin-top:18px;padding:10px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:white;border:none;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer">印刷ダイアログを開く</button>
+  </div>
+</div>
+
 <!-- Size popover (floating) -->
 <div id="sz-pop">
   <span style="color:#64748b;font-size:10px">文字サイズ</span>
@@ -510,6 +526,7 @@ let S = {
   content:   JSON.parse(JSON.stringify(DEFAULT_CONTENT)),
   images:    {},
   fontSizes: {},   // { fieldId: pt }
+  imageSizes:{},   // { slotId: scalePct }  100 = original
   cssVars:   {},   // { cssVar: value }
   chat:      [],   // [{role,text}]
   generated: false
@@ -523,6 +540,14 @@ function loadS() {
 }
 function saveS() {
   try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch(e) {}
+  showAutoSaved();
+}
+
+function showAutoSaved() {
+  const el = document.getElementById('s-txt');
+  if (!el || el.textContent.includes('生成') || el.textContent.includes('修正') || el.textContent.includes('エラー')) return;
+  el.textContent = '自動保存済み';
+  document.getElementById('s-dot').className = 'dot ok';
 }
 
 /* ============================================================
@@ -800,6 +825,7 @@ function applyAll() {
   applyContent();
   applyImages();
   applyFontSizes();
+  applyImageSizes();
   applyCssVars();
 }
 
@@ -886,6 +912,17 @@ function onSzChange(v) {
     szEl.style.fontSize = pt + 'pt';
     S.fontSizes[szEl.id] = parseFloat(pt);
     saveS();
+    checkOverflow(szEl);
+  }
+}
+
+function checkOverflow(el) {
+  document.querySelectorAll('.page-half.overflow-warn').forEach(p => p.classList.remove('overflow-warn'));
+  const page = el.closest('.page-half');
+  if (!page) return;
+  if (page.scrollHeight > page.clientHeight + 2) {
+    page.classList.add('overflow-warn');
+    setStatus('err', '用紙からはみ出しています。文字サイズを小さくしてください');
   }
 }
 
@@ -931,15 +968,44 @@ function renderImgList() {
   const list = document.getElementById('img-list');
   list.innerHTML = IMG_SLOTS.map(s => {
     const has = !!S.images[s.id];
+    const scale = S.imageSizes[s.id] || 100;
     return `
-    <div class="img-row">
-      ${has
-        ? `<img class="img-thumb" src="${S.images[s.id]}">`
-        : `<div class="img-placeholder"></div>`}
-      <span class="img-lbl">${s.lbl}</span>
-      <button class="btn-sm" onclick="pickImg('${s.id}')">変更</button>
+    <div class="img-row" style="flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px;width:100%">
+        ${has
+          ? `<img class="img-thumb" src="${S.images[s.id]}">`
+          : `<div class="img-placeholder"></div>`}
+        <span class="img-lbl">${s.lbl}</span>
+        <button class="btn-sm" onclick="pickImg('${s.id}')">変更</button>
+      </div>
+      ${has ? `
+      <div style="display:flex;align-items:center;gap:5px;width:100%;padding-top:4px">
+        <span style="font-size:9px;color:#475569;width:28px">大きさ</span>
+        <input type="range" min="40" max="150" step="5" value="${scale}"
+          style="flex:1;accent-color:#3b82f6;cursor:pointer;height:14px"
+          oninput="onImgSize('${s.id}',this.value,this.nextElementSibling)">
+        <span style="font-size:9px;font-weight:700;color:#60a5fa;width:30px;text-align:right">${scale}%</span>
+      </div>` : ''}
     </div>`;
   }).join('');
+}
+
+function onImgSize(slotId, val, labelEl) {
+  const pct = parseInt(val);
+  if (labelEl) labelEl.textContent = pct + '%';
+  S.imageSizes[slotId] = pct;
+  applyImageSizes();
+  saveS();
+}
+
+function applyImageSizes() {
+  Object.keys(S.imageSizes).forEach(id => {
+    const slot = document.getElementById(id);
+    if (!slot) return;
+    const pct = S.imageSizes[id] || 100;
+    slot.style.transform = `scale(${pct / 100})`;
+    slot.style.transformOrigin = 'center center';
+  });
 }
 
 function renderImgSizeControls() {
@@ -1155,6 +1221,12 @@ function exportPDF() {
   const d   = S.content['header-date'] || '';
   const safe = d.replace(/[年月\s　]/g,'').replace(/[\\/:*?"<>|]/g,'') || new Date().toISOString().slice(0,7).replace('-','');
   document.title = `タビオ奈良NEWS_${safe}`;
+  // Show guide first
+  document.getElementById('pdf-guide').classList.remove('hidden');
+}
+
+function closePdfGuide() {
+  document.getElementById('pdf-guide').classList.add('hidden');
   window.print();
   setTimeout(() => { document.title = 'タビオ奈良NEWS 統合エディタ v8'; }, 3000);
 }
@@ -1215,7 +1287,7 @@ function init() {
     localStorage.removeItem(SKEY);
     S = {
       content: JSON.parse(JSON.stringify(DEFAULT_CONTENT)),
-      images: {}, fontSizes: {}, cssVars: {}, chat: [], generated: false
+      images: {}, fontSizes: {}, imageSizes: {}, cssVars: {}, chat: [], generated: false
     };
     render();
     document.getElementById('chat-hist').innerHTML =
@@ -1231,7 +1303,18 @@ function init() {
   });
 
   render();
-  setStatus('idle', '準備完了');
+
+  // 復元通知
+  const hadData = localStorage.getItem(SKEY);
+  if (hadData && S.generated) {
+    setStatus('ok', '前回のデータを復元しました（自動保存済み）');
+    setTimeout(() => {
+      const cur = document.getElementById('s-txt').textContent;
+      if (cur.includes('復元')) setStatus('idle', '自動保存済み');
+    }, 4000);
+  } else {
+    setStatus('idle', '準備完了');
+  }
 
   // Restore chat history display
   if (S.chat.length > 0) {
