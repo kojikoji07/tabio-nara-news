@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タビオ奈良NEWS 統合エディタ v8</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   APP CHROME
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #0a0f1a;
+  font-family: 'Noto Sans JP', sans-serif;
+  overflow: hidden;
+  color: #e2e8f0;
+}
+
+#root { display: flex; flex-direction: column; height: 100vh; }
+
+/* --- Header --- */
+#hdr {
+  flex-shrink: 0; height: 50px;
+  background: #0a0f1a; border-bottom: 1px solid #1e293b;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px; z-index: 200;
+}
+#hdr-logo { font-size: 15px; font-weight: 900; font-style: italic; letter-spacing: -.5px; }
+#hdr-logo span { color: #f472b6; }
+#hdr-center { display: flex; align-items: center; gap: 10px; }
+.step-pill {
+  padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700;
+  background: #1e293b; color: #64748b; border: 1px solid #334155; cursor: pointer;
+  transition: all .2s;
+}
+.step-pill.active { background: #1e40af; color: #93c5fd; border-color: #3b82f6; }
+.step-pill.done { background: #14532d; color: #86efac; border-color: #16a34a; }
+#hdr-right { display: flex; align-items: center; gap: 8px; }
+
+/* --- Status --- */
+#status-wrap { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #64748b; }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.dot.idle { background: #334155; }
+.dot.busy { background: #a78bfa; animation: pulse 1s ease-in-out infinite; }
+.dot.ok   { background: #4ade80; }
+.dot.err  { background: #f87171; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* --- Body --- */
+#body { flex: 1; display: flex; overflow: hidden; }
+
+/* --- Left Panel --- */
+#left {
+  width: 360px; flex-shrink: 0;
+  background: #0f172a; border-right: 1px solid #1e293b;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#left-scroll { flex: 1; overflow-y: auto; padding: 10px; scrollbar-width: thin; }
+#left-scroll::-webkit-scrollbar { width: 4px; }
+#left-scroll::-webkit-scrollbar-track { background: #0a0f1a; }
+#left-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+
+/* --- Accordion --- */
+.acc { background: #131c2e; border-radius: 8px; margin-bottom: 8px; border: 1px solid #1e293b; overflow: hidden; }
+.acc-hd {
+  padding: 9px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  color: #cbd5e1; font-size: 11px; font-weight: 700; user-select: none;
+  transition: background .15s;
+}
+.acc-hd:hover { background: #1a2540; }
+.acc-hd-icon { font-size: 9px; color: #475569; transition: transform .2s; }
+.acc-hd.open .acc-hd-icon { transform: rotate(180deg); }
+.acc-bd { padding: 10px 12px; border-top: 1px solid #1e293b; display: none; }
+.acc-bd.open { display: block; }
+
+/* --- Form --- */
+.lbl { display: block; font-size: 9px; font-weight: 700; color: #64748b; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .07em; }
+textarea, input[type=text] {
+  width: 100%; background: #0a0f1a; border: 1px solid #1e293b;
+  border-radius: 6px; color: #e2e8f0; padding: 7px 9px;
+  font-size: 12px; resize: vertical; font-family: 'Noto Sans JP', sans-serif;
+  transition: border-color .15s;
+}
+textarea:focus, input[type=text]:focus { outline: none; border-color: #3b82f6; }
+
+/* --- Buttons --- */
+.btn-gen {
+  width: 100%; padding: 9px; border: none; border-radius: 7px;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white; font-weight: 700; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  transition: opacity .2s; margin-top: 10px;
+}
+.btn-gen:disabled { opacity: .45; cursor: not-allowed; }
+.btn-gen:not(:disabled):hover { opacity: .9; }
+
+.btn-send {
+  background: #3b82f6; color: white; border: none;
+  border-radius: 0 6px 6px 0; padding: 0 13px;
+  cursor: pointer; font-size: 14px; flex-shrink: 0;
+  transition: background .15s;
+}
+.btn-send:hover { background: #2563eb; }
+
+.btn-sm {
+  background: #1e293b; color: #cbd5e1; border: 1px solid #334155;
+  padding: 4px 9px; border-radius: 5px; font-size: 10px; cursor: pointer;
+  font-family: 'Noto Sans JP', sans-serif;
+  transition: background .15s;
+}
+.btn-sm:hover { background: #334155; }
+
+.btn-pdf {
+  background: #dc2626; color: white; border: none;
+  padding: 7px 16px; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 11px;
+  transition: background .15s;
+}
+.btn-pdf:hover { background: #b91c1c; }
+
+/* --- Tabs --- */
+.tab-grp { display: flex; gap: 3px; background: #0a0f1a; padding: 3px; border-radius: 7px; margin-bottom: 9px; }
+.tab-btn { flex: 1; padding: 4px; font-size: 11px; font-weight: 700; border: none; border-radius: 5px; cursor: pointer; background: transparent; color: #475569; transition: all .15s; }
+.tab-btn.active { background: #1e293b; color: #e2e8f0; }
+
+/* --- Chat --- */
+#chat-hist {
+  min-height: 60px; max-height: 240px; overflow-y: auto;
+  background: #070d18; border-radius: 6px; padding: 8px; margin-bottom: 7px;
+  scrollbar-width: thin;
+}
+#chat-hist::-webkit-scrollbar { width: 3px; }
+#chat-hist::-webkit-scrollbar-thumb { background: #1e293b; }
+.msg { margin-bottom: 7px; font-size: 11px; line-height: 1.6; }
+.msg.user { text-align: right; }
+.msg.user .bbl { display: inline-block; background: #1d4ed8; color: white; padding: 5px 9px; border-radius: 10px 10px 2px 10px; max-width: 92%; text-align: left; }
+.msg.ai .bbl { display: inline-block; background: #1e293b; color: #cbd5e1; padding: 5px 9px; border-radius: 10px 10px 10px 2px; max-width: 92%; }
+.chat-row { display: flex; }
+.chat-row textarea { flex: 1; border-radius: 6px 0 0 6px; border-right: none; min-height: 44px; max-height: 100px; }
+
+/* --- Image slot list --- */
+.img-row { display: flex; align-items: center; gap: 8px; padding: 5px 7px; background: #0a0f1a; border-radius: 5px; margin-bottom: 4px; }
+.img-thumb { width: 30px; height: 30px; border-radius: 4px; object-fit: cover; border: 1px solid #1e293b; flex-shrink: 0; }
+.img-placeholder { width: 30px; height: 30px; background: #131c2e; border: 1px dashed #1e293b; border-radius: 4px; flex-shrink: 0; }
+.img-lbl { font-size: 10px; color: #94a3b8; flex: 1; }
+.img-controls { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.img-size-range { width: 55px; accent-color: #3b82f6; cursor: pointer; }
+.img-size-val { font-size: 9px; color: #64748b; width: 30px; text-align: right; }
+
+/* --- Right Panel (Preview) --- */
+#right { flex: 1; overflow: auto; background: #1a2235; padding: 20px; }
+#preview-wrap { display: inline-block; transform-origin: top left; }
+
+/* --- Size popover --- */
+#sz-pop {
+  position: fixed; background: #0f172a; border: 1px solid #3b82f6;
+  border-radius: 8px; padding: 7px 11px; z-index: 500;
+  display: none; align-items: center; gap: 9px;
+  font-size: 11px; box-shadow: 0 4px 24px rgba(0,0,0,.7);
+}
+#sz-pop.vis { display: flex; }
+#sz-pop input[type=range] { width: 80px; accent-color: #3b82f6; cursor: pointer; }
+#sz-pop .close-btn { background: #1e293b; border: none; color: #94a3b8; border-radius: 4px; padding: 1px 6px; cursor: pointer; font-size: 11px; }
+
+/* --- Modal --- */
+#modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.78); z-index: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+#modal.hidden { display: none; }
+#modal-box { background: #0f172a; border-radius: 14px; padding: 30px; width: 420px; border: 1px solid #1e293b; }
+#modal-box h2 { font-size: 17px; font-weight: 900; margin-bottom: 7px; }
+#modal-box p { font-size: 12px; color: #64748b; margin-bottom: 16px; line-height: 1.6; }
+
+/* --- Spinner --- */
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.25); border-top-color: white; border-radius: 50%; animation: spin .55s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   NEWSLETTER STYLES (v7.1 preserved + enhanced)
+   ============================================================ */
+:root {
+  --color-main: #1e293b;
+  --color-accent: #dc2626;
+  --color-pink: #ec4899;
+  --p1-font-size: 28pt;
+  --p2-font-size: 9.5pt;
+  --p3-font-size: 9pt;
+  --p4-font-size: 8.5pt;
+  --p2-main-img-h: 50mm;
+  --p2-sub-img-h: 35mm;
+  --p4-founder-img-h: 45mm;
+  --icon-size: 14mm;
+  --oshikatsu-size: 24mm;
+}
+
+.sheet {
+  width: 426mm; height: 303mm;
+  background: white; display: grid; grid-template-columns: 1fr 1fr;
+  overflow: hidden; margin-bottom: 20px;
+  box-shadow: 0 2px 60px rgba(0,0,0,.5);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  font-family: 'Shippori Mincho', serif;
+  color: var(--color-main);
+}
+
+.page-half {
+  width: 213mm; height: 303mm;
+  padding: 11mm 17mm; box-sizing: border-box;
+  position: relative; display: flex; flex-direction: column; overflow: hidden;
+}
+
+.bdr-r { border-right: 1px dashed #cbd5e1; }
+
+.tag {
+  font-family: 'Noto Sans JP', sans-serif; font-size: 7pt; font-weight: 700;
+  background: var(--color-main); color: white;
+  padding: 2px 7px; display: inline-block; border-radius: 2px;
+}
+
+/* Image slots in newsletter */
+.nl-img {
+  background: #f8fafc; border: 1px dashed #cbd5e1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; overflow: hidden; flex-shrink: 0; position: relative;
+  transition: background .15s;
+}
+.nl-img:hover { background: #f0f9ff; border-color: #93c5fd; }
+.nl-img img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; display: block; }
+.nl-img .nl-hint { font-family: 'Noto Sans JP', sans-serif; font-size: 6px; color: #94a3b8; font-weight: 900; text-align: center; line-height: 1.5; pointer-events: none; }
+.nl-round { border-radius: 9999px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+
+/* P1 cover bg */
+.p1-cover {
+  position: absolute; inset: 0; z-index: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; overflow: hidden;
+  background: #f1f5f9;
+}
+.p1-cover img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.p1-cover .cover-hint { position: absolute; font-family: 'Noto Sans JP', sans-serif; font-size: 9px; color: #94a3b8; font-weight: 700; text-align: center; pointer-events: none; }
+
+/* Editable elements */
+.nle {
+  cursor: text; min-height: .8em; outline: none;
+  transition: background .1s;
+}
+.nle:hover:not(:focus) { background: rgba(59,130,246,.04); }
+.nle:focus { outline: 1.5px solid var(--color-accent); background: rgba(255,255,255,.85); }
+
+.cols2 { column-count: 2; column-gap: 7mm; }
+
+/* Print */
+@media print {
+  html, body { overflow: visible !important; height: auto !important; }
+  #hdr, #left, #sz-pop, #modal { display: none !important; }
+  #body { display: block !important; overflow: visible !important; }
+  #right { padding: 0 !important; background: none !important; overflow: visible !important; }
+  #preview-wrap { zoom: 1 !important; transform: none !important; display: block !important; }
+  .sheet { margin: 0 !important; box-shadow: none !important; page-break-after: always; }
+  @page { size: 426mm 303mm; margin: 0; }
+}
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- ===== API KEY MODAL ===== -->
+  <div id="modal">
+    <div id="modal-box">
+      <h2>🔑 Gemini APIキーを設定</h2>
+      <p>Google AI Studio で取得したAPIキーを入力してください。<br>このPCのブラウザに保存されます（他のPCには共有されません）。</p>
+      <label class="lbl">APIキー</label>
+      <input type="text" id="api-key-in" placeholder="AIzaSy..." style="margin-bottom:12px;font-family:monospace;font-size:11px">
+      <button class="btn-gen" id="btn-save-key" style="margin-top:0">保存して開始</button>
+      <button id="btn-check-models" style="width:100%;margin-top:8px;padding:7px;background:#1e293b;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:11px;cursor:pointer">
+        🔍 このAPIキーで使えるモデルを確認する
+      </button>
+      <div id="model-list" style="margin-top:8px;font-size:10px;color:#64748b;display:none"></div>
+      <p style="text-align:center;margin-top:10px;font-size:10px">
+        <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#3b82f6">Google AI Studio</a> で無料取得できます
+      </p>
+    </div>
+  </div>
+
+  <!-- ===== HEADER ===== -->
+  <div id="hdr">
+    <div id="hdr-logo">タビオ奈良NEWS <span>v8</span></div>
+    <div id="hdr-center">
+      <div id="status-wrap">
+        <span class="dot idle" id="s-dot"></span>
+        <span id="s-txt">準備完了</span>
+      </div>
+    </div>
+    <div id="hdr-right">
+      <button class="btn-sm" id="btn-chg-key">🔑 APIキー変更</button>
+      <button class="btn-sm" id="btn-reset">↺ 初期化</button>
+      <button class="btn-pdf" id="btn-pdf">🖨 PDF出力</button>
+    </div>
+  </div>
+
+  <!-- ===== BODY ===== -->
+  <div id="body">
+
+    <!-- LEFT PANEL -->
+    <div id="left">
+      <div id="left-scroll">
+
+        <!-- ① 素材入力 -->
+        <div class="acc">
+          <div class="acc-hd open" data-acc="s1" onclick="toggleAcc(this)">
+            <span>✏️ ①　素材を入力してAI生成</span>
+            <span class="acc-hd-icon">▼</span>
+          </div>
+          <div class="acc-bd open" id="s1">
+            <div class="tab-grp">
+              <button class="tab-btn active" onclick="swTab('text',this)">テキスト</button>
+              <button class="tab-btn" onclick="swTab('audio',this)">音声ファイル</button>
+            </div>
+            <div id="tab-text">
+              <label class="lbl" style="margin-bottom:4px">素材テキスト（インタビュー・メモ・メッセージ等）</label>
+              <textarea id="mat-text" rows="9" placeholder="今月号のすべての素材をここに貼り付けてください。
+
+インタビュー内容、各社長のメッセージ、感謝の言葉、推し活情報、数字データなど、何でも貼ってください。AIが整理して原稿にします。"></textarea>
+            </div>
+            <div id="tab-audio" style="display:none">
+              <label class="lbl">音声ファイル（MP3・M4A・WAV / 20MB以下推奨）</label>
+              <input type="file" id="mat-audio" accept="audio/*" style="color:#94a3b8;font-size:11px;padding:7px;background:#0a0f1a;border:1px dashed #1e293b;border-radius:6px;width:100%;cursor:pointer">
+              <p style="font-size:10px;color:#475569;margin-top:5px">⚠ 録音時間が長い場合は読み込みに時間がかかります</p>
+            </div>
+            <div style="margin-top:9px">
+              <label class="lbl">発行年月（省略可）</label>
+              <input type="text" id="mat-date" placeholder="例：2026年5月" style="font-size:12px">
+            </div>
+            <button class="btn-gen" id="btn-gen">
+              <span class="spin" id="gen-spin" style="display:none"></span>
+              <span id="gen-txt">✨ AI原稿を生成する</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ② AI修正チャット -->
+        <div class="acc">
+          <div class="acc-hd" data-acc="s2" onclick="toggleAcc(this)">
+            <span>💬 ②　AIに修正を依頼する</span>
+            <span class="acc-hd-icon">▼</span>
+          </div>
+          <div class="acc-bd" id="s2">
+            <div id="chat-hist">
+              <p style="color:#334155;font-size:11px;text-align:center;padding:16px 0">①でAI生成すると<br>ここでチャット修正できます</p>
+            </div>
+            <div class="chat-row">
+              <textarea id="chat-in" placeholder="例：P2の仕事の肝をもう少し短くして&#10;例：P1タイトルをもっと力強い表現に変えて&#10;&#10;Ctrl+Enterで送信" rows="3"></textarea>
+              <button class="btn-send" id="btn-chat">➤</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ③ 写真・サイズ調整 -->
+        <div class="acc">
+          <div class="acc-hd" data-acc="s3" onclick="toggleAcc(this)">
+            <span>🖼 ③　写真・サイズ調整</span>
+            <span class="acc-hd-icon">▼</span>
+          </div>
+          <div class="acc-bd" id="s3">
+            <p style="font-size:10px;color:#475569;margin-bottom:8px;line-height:1.6">
+              写真：「変更」ボタン、またはプレビュー上の写真エリアをクリック<br>
+              文字サイズ：プレビュー上の文字をクリック → スライダーで調整
+            </p>
+            <div id="img-list"><!-- populated --></div>
+            <div style="border-top:1px solid #1e293b;padding-top:9px;margin-top:5px">
+              <p style="font-size:9px;font-weight:700;color:#64748b;margin-bottom:7px;text-transform:uppercase;letter-spacing:.05em">画像エリアの高さ</p>
+              <div id="img-size-controls"><!-- populated --></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- left-scroll -->
+    </div><!-- left -->
+
+    <!-- RIGHT PANEL: Preview -->
+    <div id="right">
+      <div id="preview-wrap" id="pw"><!-- newsletter --></div>
+    </div>
+
+  </div><!-- body -->
+</div><!-- root -->
+
+<!-- Size popover (floating) -->
+<div id="sz-pop">
+  <span style="color:#64748b;font-size:10px">文字サイズ</span>
+  <input type="range" id="sz-range" min="6" max="60" step="0.5" oninput="onSzChange(this.value)">
+  <span id="sz-val" style="font-weight:700;color:#60a5fa;min-width:30px">12pt</span>
+  <button class="close-btn" onclick="closeSzPop()">✕</button>
+</div>
+<!-- Hidden file input for images -->
+<input type="file" id="img-input" accept="image/*" style="display:none">
+
+<script>
+/* ============================================================
+   CONSTANTS
+   ============================================================ */
+const SKEY  = 'tabio_v8';
+const AKEY  = 'tabio_gemini_apikey';
+const MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-001',
+];
+let modelIdx = 0;
+function GURL() {
+  // v1を先に試し、失敗したらv1betaにフォールバック
+  return `https://generativelanguage.googleapis.com/v1/models/${MODELS[modelIdx]}:generateContent`;
+}
+
+const FIELDS = [
+  'header-date','P1_タイトル','P1_サマリー1','P1_サマリー2','P1_サマリー3',
+  'P2_見出し','P2_仕事の肝','P2_BeforeAfter',
+  'P3_トピック1','P3_トピック2','P3_トピック3',
+  'P3_奈良社長_事実','P3_奈良社長_大事','P3_奈良社長_願い','P3_数字',
+  'P4_創業者の言葉','P4_創業者の言葉の理解',
+  'P4_ありがとう1','P4_ありがとう2','P4_ありがとう3',
+  'P2_推し活','P4_言いにくい','P4_編集後記','P4_予告'
+];
+
+const IMG_SLOTS = [
+  {id:'nl-img-p1',    lbl:'P1 表紙写真'},
+  {id:'nl-img-p2m',   lbl:'P2 メイン写真'},
+  {id:'nl-img-p2s',   lbl:'P2 サブ写真'},
+  {id:'nl-img-ochi',  lbl:'P3 越智社長'},
+  {id:'nl-img-masago',lbl:'P3 真砂社長'},
+  {id:'nl-img-found', lbl:'P4 創業者写真'},
+  {id:'nl-img-thx1',  lbl:'P4 ありがとう①'},
+  {id:'nl-img-thx2',  lbl:'P4 ありがとう②'},
+  {id:'nl-img-thx3',  lbl:'P4 ありがとう③'},
+  {id:'nl-img-oshi',  lbl:'P4 推し活写真'},
+];
+
+// Image sizes controllable via sidebar sliders
+const IMG_SIZES = [
+  {cssVar:'--p2-main-img-h',  lbl:'P2 メイン写真の高さ', min:25, max:80, step:2, unit:'mm', def:50},
+  {cssVar:'--p2-sub-img-h',   lbl:'P2 サブ写真の高さ',   min:15, max:60, step:2, unit:'mm', def:35},
+  {cssVar:'--p4-founder-img-h',lbl:'P4 創業者写真の高さ', min:25, max:75, step:2, unit:'mm', def:45},
+  {cssVar:'--icon-size',       lbl:'顔写真（丸）のサイズ', min:9,  max:25, step:1, unit:'mm', def:14},
+  {cssVar:'--oshikatsu-size',  lbl:'推し活写真のサイズ',   min:14, max:40, step:2, unit:'mm', def:24},
+  {cssVar:'--p1-font-size',    lbl:'P1 タイトル文字サイズ', min:16, max:48, step:1, unit:'pt', def:28},
+];
+
+const DEFAULT_CONTENT = Object.fromEntries(FIELDS.map(f => [f, '']));
+DEFAULT_CONTENT['header-date'] = '2026年__月';
+DEFAULT_CONTENT['P4_予告']     = '次号もお楽しみに！';
+
+const GEN_PROMPT = `【役割】
+あなたは「タビオ奈良・広報誌 入稿データ作成エディター」です。提供された素材（インタビュー、メッセージ、メモ）を元に、主婦パート層に刺さる温かくプロフェッショナルな文章を執筆し、Webアプリの各項目にそのまま使用できる形式で出力します。
+
+【出力の絶対ルール】
+・1項目＝1つのコードブロック（バッククォート3つ）で出力してください
+・各コードブロックの直前に項目名（例：P1_タイトル）を明記してください
+・引用タグ・注釈・出典リンクは一切含めないでください
+・純粋なテキストのみを出力してください
+
+【必須出力項目と制約】
+header-date: 発行年月（例：2026年5月）
+P1_タイトル: 全体を象徴するメインタイトル
+P1_サマリー1: 【動き】150文字以内
+P1_サマリー2: 【変化】150文字以内
+P1_サマリー3: 【挑戦】150文字以内
+P2_見出し: 現場の誇りを感じさせるキャッチーな見出し
+P2_仕事の肝: 900〜1100文字。現場の誇りをテーマに執筆
+P2_BeforeAfter: 改善前後を比較、200文字以内
+P3_トピック1: 越智社長【序】200文字
+P3_トピック2: 越智社長【破】200文字
+P3_トピック3: 越智社長【急】200文字
+P3_奈良社長_事実: 真砂社長【動き・事実】200文字
+P3_奈良社長_大事: 真砂社長【大切な哲学】200文字
+P3_奈良社長_願い: 真砂社長【社員への願い】200文字
+P3_数字: 象徴的な数字とその意味（1行）
+P4_創業者の言葉: 格言のみ（1行）
+P4_創業者の言葉の理解: 格言の現代的解釈200〜300文字
+P4_ありがとう1: 感謝メッセージ①（相手の名前から始める）
+P4_ありがとう2: 感謝メッセージ②
+P4_ありがとう3: 感謝メッセージ③
+P2_推し活: 社員の趣味・リフレッシュ紹介200〜300文字
+P4_言いにくい: 現場のちょっとした本音（1行）
+P4_編集後記: 今月のテーマに沿った気づき100文字程度
+P4_予告: 次号予告
+
+【文体】主婦パート・社員が「自分の仕事は世界と繋がっている」と誇りを持てる温かいトーン。専門用語を噛み砕き、情景が浮かぶ一流記者の文章。`;
+
+const REFINE_PROMPT = `あなたはタビオ奈良広報誌の編集アシスタントです。
+ユーザーの修正依頼を受けて、変更が必要な項目のみ出力してください。
+
+出力フォーマット（変更する項目のみ）：
+項目名
+\`\`\`
+修正後の内容
+\`\`\`
+
+変更しない項目は出力しないでください。引用タグ・注釈を含めないでください。
+修正内容を1〜2文で説明してください（コードブロックの外に）。`;
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let S = {
+  content:   JSON.parse(JSON.stringify(DEFAULT_CONTENT)),
+  images:    {},
+  fontSizes: {},   // { fieldId: pt }
+  cssVars:   {},   // { cssVar: value }
+  chat:      [],   // [{role,text}]
+  generated: false
+};
+
+function loadS() {
+  try {
+    const d = localStorage.getItem(SKEY);
+    if (d) { const p = JSON.parse(d); S = {...S, ...p}; }
+  } catch(e) {}
+}
+function saveS() {
+  try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch(e) {}
+}
+
+/* ============================================================
+   GEMINI API
+   ============================================================ */
+function getKey() { return localStorage.getItem(AKEY) || ''; }
+
+async function callGemini(userParts, sysPmt, history = []) {
+  const key = getKey();
+  if (!key) throw new Error('APIキーが設定されていません');
+
+  const msgs = [];
+
+  // system_instructionの代わりに、最初のターンとしてシステムプロンプトを埋め込む
+  // → v1 / v1beta どちらのエンドポイントでも動作する
+  msgs.push({
+    role: 'user',
+    parts: [{ text: sysPmt }]
+  });
+  msgs.push({
+    role: 'model',
+    parts: [{ text: '了解しました。指示に従って作業を進めます。' }]
+  });
+
+  history.forEach(h => msgs.push({ role: h.role, parts: [{ text: h.text }] }));
+  msgs.push({ role: 'user', parts: userParts });
+
+  const body = {
+    contents: msgs,
+    generationConfig: { temperature: 0.75, maxOutputTokens: 8192 }
+  };
+
+  const res = await fetch(`${GURL()}?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (data.error) {
+    // モデルが使えない場合は次のモデルで自動リトライ
+    if ((data.error.code === 404 || data.error.code === 400) && modelIdx < MODELS.length - 1) {
+      modelIdx++;
+      console.warn(`モデル切替 → ${MODELS[modelIdx]}`);
+      return callGemini(userParts, sysPmt, history);
+    }
+    throw new Error(`[${data.error.code}] ${data.error.message || JSON.stringify(data.error)}`);
+  }
+  return data.candidates[0].content.parts[0].text;
+}
+
+/* ============================================================
+   PARSER
+   ============================================================ */
+function parseGemini(text) {
+  const result = {};
+  for (const f of FIELDS) {
+    const esc = f.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const re  = new RegExp(esc + '\\s*\\n```[^\\n]*\\n([\\s\\S]*?)\\n```','g');
+    const m   = re.exec(text);
+    if (m) result[f] = m[1].trim();
+  }
+  return result;
+}
+
+/* ============================================================
+   NEWSLETTER HTML
+   ============================================================ */
+function nlHTML() {
+  return `
+  <!-- Sheet 1: P4 + P1 -->
+  <div class="sheet" id="sheet1">
+
+    <!-- P4 Philosophy -->
+    <div class="page-half bdr-r" id="page4">
+      <!-- 創業者コーナー -->
+      <div style="flex-shrink:0;text-align:center;margin-bottom:3.5mm">
+        <div class="tag" style="margin-bottom:2mm">Philosophy</div>
+        <div id="P4_創業者の言葉" class="nle"
+          contenteditable="true" onclick="showSzPop(this,event)"
+          style="font-size:12pt;font-weight:700;font-style:italic;margin-bottom:2.5mm;line-height:1.45;padding:1mm 2mm"></div>
+        <div style="display:flex;justify-content:center;margin-bottom:2.5mm">
+          <div id="nl-img-found" class="nl-img"
+            style="height:var(--p4-founder-img-h);aspect-ratio:5/7;width:auto;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,.18);border-radius:1mm"
+            onclick="pickImg('nl-img-found')">
+            <span class="nl-hint">5:7<br>Portrait<br>クリックで選択</span>
+          </div>
+        </div>
+        <div id="P4_創業者の言葉の理解" class="nle"
+          contenteditable="true" onclick="showSzPop(this,event)"
+          style="font-size:var(--p4-font-size);text-align:left;background:white;padding:2.5mm 3mm;border:1px solid #e8ecf1;box-shadow:0 1px 3px rgba(0,0,0,.05);line-height:1.85;margin:0 1mm"></div>
+      </div>
+      <!-- ありがとうリレー -->
+      <div style="flex-shrink:0;margin-bottom:3.5mm">
+        <div class="tag" style="margin-bottom:2mm">ありがとうリレー</div>
+        ${[1,2,3].map(i => `
+        <div style="display:flex;align-items:center;gap:2.5mm;background:rgba(255,255,255,.55);padding:1.5mm 2mm;border-radius:2mm;border:1px solid rgba(255,255,255,.7);margin-bottom:2mm">
+          <div id="nl-img-thx${i}" class="nl-img nl-round"
+            style="width:var(--icon-size);height:var(--icon-size);flex-shrink:0"
+            onclick="pickImg('nl-img-thx${i}')"></div>
+          <div id="P4_ありがとう${i}" class="nle"
+            contenteditable="true" onclick="showSzPop(this,event)"
+            style="font-size:var(--p4-font-size);line-height:1.6;flex-grow:1"></div>
+        </div>`).join('')}
+      </div>
+      <!-- 推し活 -->
+      <div style="background:white;padding:2.5mm 3mm;border-radius:2.5mm;border:1px solid #e8ecf1;margin-bottom:3.5mm;flex-shrink:0">
+        <div class="tag" style="background:#dc2626;margin-bottom:2mm">OFFの充電：推し活</div>
+        <div style="display:flex;gap:3mm;align-items:flex-start;margin-top:1mm">
+          <div id="nl-img-oshi" class="nl-img"
+            style="width:var(--oshikatsu-size);height:var(--oshikatsu-size);border-radius:2mm;flex-shrink:0"
+            onclick="pickImg('nl-img-oshi')"></div>
+          <div id="P2_推し活" class="nle"
+            contenteditable="true" onclick="showSzPop(this,event)"
+            style="font-size:var(--p4-font-size);font-style:italic;line-height:1.7;flex-grow:1;overflow:hidden"></div>
+        </div>
+      </div>
+      <!-- フッター -->
+      <div style="margin-top:auto;padding-top:2.5mm;border-top:2px solid var(--color-main);flex-shrink:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4mm">
+          <div style="flex-grow:1;overflow:hidden">
+            <div id="P4_言いにくい" class="nle"
+              contenteditable="true" onclick="showSzPop(this,event)"
+              style="font-size:7pt;color:#64748b;margin-bottom:1.5mm"></div>
+            <div id="P4_編集後記" class="nle"
+              contenteditable="true" onclick="showSzPop(this,event)"
+              style="font-size:var(--p4-font-size);font-weight:700;border-left:3.5px solid var(--color-main);padding-left:2.5mm;line-height:1.6"></div>
+          </div>
+          <div style="background:var(--color-main);color:white;padding:2mm 3.5mm;border-radius:2mm;font-family:'Noto Sans JP',sans-serif;font-size:6.5pt;font-weight:900;font-style:italic;text-align:center;line-height:1.5;flex-shrink:0;min-width:22mm">
+            NEXT ISSUE<br>
+            <span id="P4_予告" class="nle"
+              contenteditable="true" onclick="showSzPop(this,event)"
+              style="font-size:7pt;font-weight:400;font-style:normal;display:inline-block"></span>
+          </div>
+        </div>
+      </div>
+    </div><!-- page4 end -->
+
+    <!-- P1 Cover -->
+    <div class="page-half" id="page1" style="padding:0;position:relative">
+      <div class="p1-cover" id="nl-img-p1" onclick="pickImg('nl-img-p1')">
+        <span class="cover-hint">クリックして<br>表紙写真を選択</span>
+      </div>
+      <!-- Overlay UI -->
+      <div style="position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;padding:0;pointer-events:none">
+        <!-- ヘッダーバー -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;background:rgba(255,255,255,.93);padding:5mm 6mm 4mm;border-bottom:2px solid #0f172a;pointer-events:auto">
+          <div>
+            <div style="font-family:'Noto Sans JP',sans-serif;font-size:18pt;font-weight:900;letter-spacing:-.04em;font-style:italic;line-height:1">タビオ奈良NEWS</div>
+            <div style="font-size:5.5pt;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.12em">Tabio Nara Logistics News</div>
+          </div>
+          <div style="text-align:right">
+            <div id="header-date" class="nle"
+              contenteditable="true" onclick="showSzPop(this,event)"
+              style="font-family:'Noto Sans JP',sans-serif;font-size:13pt;font-weight:900;line-height:1.2"></div>
+            <div style="font-size:6pt;font-weight:700;color:#dc2626;text-transform:uppercase">Monthly Journal</div>
+          </div>
+        </div>
+        <!-- タイトルカード -->
+        <div style="margin-top:auto;background:rgba(255,255,255,.95);padding:7mm 7mm 6mm;border-top:8px solid var(--color-pink);box-shadow:0 -3px 18px rgba(0,0,0,.14);pointer-events:auto">
+          <div class="tag" style="background:var(--color-pink);font-style:italic;margin-bottom:2mm">今月のトピック</div>
+          <div id="P1_タイトル" class="nle"
+            contenteditable="true" onclick="showSzPop(this,event)"
+            style="font-family:'Noto Sans JP',sans-serif;font-size:var(--p1-font-size);font-weight:900;line-height:1.2;letter-spacing:-.025em;margin-bottom:4mm"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3mm">
+            ${[1,2,3].map(i => `
+            <div style="border-left:3px solid #dde3ed;padding-left:2mm">
+              <div style="font-size:5.5px;color:#94a3b8;font-weight:900;text-transform:uppercase;font-family:'Noto Sans JP',sans-serif">Perspective 0${i}</div>
+              <div id="P1_サマリー${i}" class="nle"
+                contenteditable="true" onclick="showSzPop(this,event)"
+                style="font-size:7.5pt;font-weight:700;line-height:1.5;padding-top:.5mm"></div>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div><!-- page1 end -->
+
+  </div><!-- sheet1 end -->
+
+  <!-- Sheet 2: P2 + P3 -->
+  <div class="sheet" id="sheet2">
+
+    <!-- P2 Feature -->
+    <div class="page-half bdr-r" id="page2">
+      <div class="tag" style="margin-bottom:1.5mm">Feature Interview</div>
+      <div id="P2_見出し" class="nle"
+        contenteditable="true" onclick="showSzPop(this,event)"
+        style="font-family:'Noto Sans JP',sans-serif;font-size:14pt;font-weight:900;border-bottom:2px solid var(--color-main);padding-bottom:1mm;margin-bottom:3mm;letter-spacing:-.02em;line-height:1.3"></div>
+      <div id="nl-img-p2m" class="nl-img"
+        style="width:100%;height:var(--p2-main-img-h);margin-bottom:3mm;border-radius:1mm;box-shadow:0 1px 5px rgba(0,0,0,.08)"
+        onclick="pickImg('nl-img-p2m')">
+        <span class="nl-hint">メイン写真（クリックで選択）</span>
+      </div>
+      <div class="cols2" style="flex-grow:1;overflow:hidden;text-align:justify">
+        <div id="P2_仕事の肝" class="nle"
+          contenteditable="true" onclick="showSzPop(this,event)"
+          style="font-size:var(--p2-font-size);white-space:pre-wrap;line-height:1.95;font-weight:700;color:#2d3a4a"></div>
+        <div style="break-inside:avoid">
+          <div id="nl-img-p2s" class="nl-img"
+            style="width:100%;height:var(--p2-sub-img-h);margin:2mm 0;border-radius:1mm;border:1px solid #e8ecf1"
+            onclick="pickImg('nl-img-p2s')">
+            <span class="nl-hint">サブ写真</span>
+          </div>
+          <div id="P2_BeforeAfter" class="nle"
+            contenteditable="true" onclick="showSzPop(this,event)"
+            style="font-size:8pt;padding:2.5mm;background:#fff5f5;border:1px solid #fecaca;border-radius:1mm;color:#991b1b;font-weight:700;line-height:1.7"></div>
+        </div>
+      </div>
+    </div><!-- page2 end -->
+
+    <!-- P3 Management -->
+    <div class="page-half" id="page3">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:3.5mm">
+        <div style="font-family:'Noto Sans JP',sans-serif;font-size:14pt;font-weight:900;text-transform:uppercase;letter-spacing:-.02em;line-height:1">Monthly Updates</div>
+        <div class="tag">Management Strategy</div>
+      </div>
+      <!-- HQ Strategy -->
+      <div style="display:flex;gap:3mm;align-items:flex-start;padding:3mm;background:#f8fafc;border-left:4px solid var(--color-main);box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:3mm;flex-shrink:0">
+        <div style="flex-grow:1;min-width:0">
+          <div style="font-size:6.5pt;font-weight:900;color:#94a3b8;text-transform:uppercase;font-family:'Noto Sans JP',sans-serif;margin-bottom:1.5mm">HQ Strategy</div>
+          ${[1,2,3].map(i => `
+          <div id="P3_トピック${i}" class="nle"
+            contenteditable="true" onclick="showSzPop(this,event)"
+            style="font-size:var(--p3-font-size);font-weight:700;line-height:1.7;margin-bottom:1.5mm"></div>`).join('')}
+        </div>
+        <div id="nl-img-ochi" class="nl-img nl-round"
+          style="width:var(--icon-size);height:var(--icon-size);flex-shrink:0"
+          onclick="pickImg('nl-img-ochi')"></div>
+      </div>
+      <!-- Presidential Message -->
+      <div style="display:flex;gap:3mm;align-items:flex-start;background:var(--color-main);color:white;padding:4mm;border-radius:3mm;box-shadow:0 2px 10px rgba(0,0,0,.2);flex-grow:1;overflow:hidden">
+        <div style="flex-grow:1;min-width:0;display:flex;flex-direction:column;gap:2mm;overflow:hidden">
+          <div style="font-size:6.5pt;font-weight:900;color:#4b6080;text-transform:uppercase;font-family:'Noto Sans JP',sans-serif">Presidential Message</div>
+          ${[
+            ['P3_奈良社長_事実','STATUS','#f87171','#fef2f2',''],
+            ['P3_奈良社長_大事','CORE','#f87171','#fef9f9','font-weight:700'],
+            ['P3_奈良社長_願い','ACTION','#f87171','#fce7e7','font-style:italic'],
+          ].map(([id,label,lc,bg,extra]) => `
+          <div style="background:rgba(239,68,68,.07);padding:2mm;border-radius:2mm;border:1px solid rgba(239,68,68,.18)">
+            <div style="font-size:5.5pt;color:${lc};font-weight:900;font-family:'Noto Sans JP',sans-serif;margin-bottom:.5mm">${label}</div>
+            <div id="${id}" class="nle"
+              contenteditable="true" onclick="showSzPop(this,event)"
+              style="font-size:var(--p3-font-size);line-height:1.65;color:${bg};${extra}"></div>
+          </div>`).join('')}
+        </div>
+        <div id="nl-img-masago" class="nl-img nl-round"
+          style="width:var(--icon-size);height:var(--icon-size);flex-shrink:0"
+          onclick="pickImg('nl-img-masago')"></div>
+      </div>
+      <!-- KPI -->
+      <div style="text-align:center;padding:3.5mm;border:3px double #dde3ed;border-radius:2mm;flex-shrink:0;margin-top:3mm">
+        <div style="font-size:6.5pt;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.3em;font-family:'Noto Sans JP',sans-serif;margin-bottom:.5mm">GLOBAL KPI TRACKER</div>
+        <div id="P3_数字" class="nle"
+          contenteditable="true" onclick="showSzPop(this,event)"
+          style="font-family:'Noto Sans JP',sans-serif;font-size:36pt;font-weight:900;letter-spacing:-.04em;font-style:italic;color:var(--color-main);line-height:1"></div>
+      </div>
+    </div><!-- page3 end -->
+
+  </div><!-- sheet2 end -->
+  `;
+}
+
+/* ============================================================
+   RENDER & APPLY
+   ============================================================ */
+function render() {
+  document.getElementById('preview-wrap').innerHTML = nlHTML();
+  attachNLListeners();
+  applyAll();
+  rescale();
+  renderImgList();
+  renderImgSizeControls();
+}
+
+function applyAll() {
+  applyContent();
+  applyImages();
+  applyFontSizes();
+  applyCssVars();
+}
+
+function applyContent() {
+  FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.innerText = S.content[id] || '';
+  });
+}
+
+function applyImages() {
+  Object.keys(S.images).forEach(id => {
+    const slot = document.getElementById(id);
+    if (!slot || !S.images[id]) return;
+    const ex = slot.querySelector('img');
+    if (ex) { ex.src = S.images[id]; }
+    else { slot.innerHTML = `<img src="${S.images[id]}" style="width:100%;height:100%;object-fit:cover">`; }
+  });
+}
+
+function applyFontSizes() {
+  Object.keys(S.fontSizes).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.fontSize = S.fontSizes[id] + 'pt';
+  });
+}
+
+function applyCssVars() {
+  Object.keys(S.cssVars).forEach(v => {
+    document.documentElement.style.setProperty(v, S.cssVars[v]);
+  });
+}
+
+function attachNLListeners() {
+  document.querySelectorAll('.nle').forEach(el => {
+    el.addEventListener('input', () => {
+      if (FIELDS.includes(el.id)) { S.content[el.id] = el.innerText; saveS(); }
+    });
+  });
+}
+
+/* ============================================================
+   RESCALE
+   ============================================================ */
+function rescale() {
+  const right = document.getElementById('right');
+  const wrap  = document.getElementById('preview-wrap');
+  const avail = right.clientWidth - 40;
+  const sheetPx = 426 * (96 / 25.4); // mm to CSS px
+  const scale = Math.min(1, avail / sheetPx);
+  wrap.style.zoom = scale.toFixed(4);
+}
+window.addEventListener('resize', rescale);
+
+/* ============================================================
+   SIZE POPOVER
+   ============================================================ */
+let szEl = null;
+
+function showSzPop(el, e) {
+  if (e) e.stopPropagation();
+  szEl = el;
+  const pop   = document.getElementById('sz-pop');
+  const range = document.getElementById('sz-range');
+  const val   = document.getElementById('sz-val');
+
+  const cs  = window.getComputedStyle(el);
+  const pxSz = parseFloat(cs.fontSize);
+  const ptSz = (pxSz * 0.75).toFixed(1);
+
+  range.value = ptSz;
+  val.textContent = ptSz + 'pt';
+
+  const rect = el.getBoundingClientRect();
+  pop.style.left = Math.min(window.innerWidth - 250, Math.max(4, rect.left)) + 'px';
+  pop.style.top  = Math.max(55, rect.top - 46) + 'px';
+  pop.classList.add('vis');
+}
+
+function onSzChange(v) {
+  const pt = parseFloat(v).toFixed(1);
+  document.getElementById('sz-val').textContent = pt + 'pt';
+  if (szEl) {
+    szEl.style.fontSize = pt + 'pt';
+    S.fontSizes[szEl.id] = parseFloat(pt);
+    saveS();
+  }
+}
+
+function closeSzPop() {
+  document.getElementById('sz-pop').classList.remove('vis');
+  szEl = null;
+}
+
+// Close popover on outside click
+document.addEventListener('click', () => closeSzPop());
+document.getElementById('sz-pop').addEventListener('click', e => e.stopPropagation());
+
+/* ============================================================
+   IMAGE UPLOAD
+   ============================================================ */
+let picTarget = null;
+
+function pickImg(slotId) {
+  picTarget = slotId;
+  const inp = document.getElementById('img-input');
+  inp.value = '';
+  inp.click();
+}
+
+document.getElementById('img-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file || !picTarget) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    S.images[picTarget] = ev.target.result;
+    const slot = document.getElementById(picTarget);
+    if (slot) slot.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+    saveS();
+    renderImgList();
+  };
+  reader.readAsDataURL(file);
+});
+
+/* ============================================================
+   SIDEBAR: Image list & size sliders
+   ============================================================ */
+function renderImgList() {
+  const list = document.getElementById('img-list');
+  list.innerHTML = IMG_SLOTS.map(s => {
+    const has = !!S.images[s.id];
+    return `
+    <div class="img-row">
+      ${has
+        ? `<img class="img-thumb" src="${S.images[s.id]}">`
+        : `<div class="img-placeholder"></div>`}
+      <span class="img-lbl">${s.lbl}</span>
+      <button class="btn-sm" onclick="pickImg('${s.id}')">変更</button>
+    </div>`;
+  }).join('');
+}
+
+function renderImgSizeControls() {
+  const wrap = document.getElementById('img-size-controls');
+  wrap.innerHTML = IMG_SIZES.map(cfg => {
+    const curRaw = S.cssVars[cfg.cssVar] || cfg.def + cfg.unit;
+    const cur = parseFloat(curRaw);
+    return `
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:10px;color:#64748b">${cfg.lbl}</span>
+        <span id="sv-${cfg.cssVar.slice(2)}" style="font-size:9px;font-weight:700;color:#60a5fa">${cur}${cfg.unit}</span>
+      </div>
+      <input type="range" min="${cfg.min}" max="${cfg.max}" step="${cfg.step}" value="${cur}"
+        style="width:100%;accent-color:#3b82f6;cursor:pointer"
+        oninput="onCssVar('${cfg.cssVar}','${cfg.unit}',this.value,'sv-${cfg.cssVar.slice(2)}')">
+    </div>`;
+  }).join('');
+}
+
+function onCssVar(cssVar, unit, val, labelId) {
+  const v = parseFloat(val);
+  document.documentElement.style.setProperty(cssVar, v + unit);
+  S.cssVars[cssVar] = v + unit;
+  const lbl = document.getElementById(labelId);
+  if (lbl) lbl.textContent = v + unit;
+  saveS();
+}
+
+/* ============================================================
+   GENERATION
+   ============================================================ */
+async function generate() {
+  const key = getKey();
+  if (!key) { alert('ヘッダー右の「🔑 APIキー変更」からAPIキーを設定してください'); return; }
+
+  const txt  = document.getElementById('mat-text').value.trim();
+  const aFile= document.getElementById('mat-audio').files[0];
+  const date = document.getElementById('mat-date').value.trim();
+
+  if (!txt && !aFile) { alert('テキスト素材または音声ファイルを入力してください'); return; }
+
+  setStatus('busy', '生成中...');
+  setBusy(true);
+
+  try {
+    const parts = [];
+    let prompt  = '以下の素材を元に、指定されたすべての項目の原稿を作成してください。\n\n';
+    if (date) prompt += `発行年月：${date}\n\n`;
+    if (txt)  prompt += `【素材テキスト】\n${txt}`;
+    parts.push({ text: prompt });
+
+    if (aFile) {
+      setStatus('busy', '音声読み込み中...');
+      const b64  = await f2b64(aFile);
+      const mime = aFile.type || 'audio/mpeg';
+      parts.push({ inline_data: { mime_type: mime, data: b64 } });
+    }
+
+    setStatus('busy', 'Geminiが執筆中...');
+    const out  = await callGemini(parts, GEN_PROMPT);
+    const parsed = parseGemini(out);
+    const n    = Object.keys(parsed).length;
+
+    if (n === 0) {
+      addMsg('ai', `⚠️ テキスト解析に失敗しました。Geminiの応答形式が想定外です。\n\nGeminiの出力先頭:\n${out.slice(0,400)}`);
+      setStatus('err', '解析失敗');
+    } else {
+      Object.assign(S.content, parsed);
+      S.generated = true;
+      applyContent();
+      saveS();
+      addMsg('ai', `✅ ${n}項目の原稿を生成しました！\n\nプレビューをご確認ください。\n修正したい箇所があれば、下のテキストボックスに要望を入力して送信してください。\n\n例：「P1タイトルをもっとインパクトのある表現に」\n例：「P2仕事の肝を少し短くして」`);
+      // Open chat accordion
+      openAcc('s2');
+      setStatus('ok', `${n}項目 生成完了`);
+    }
+  } catch(err) {
+    const msg = `❌ エラー：${err.message}\n\n【確認事項】\n・「🔑 APIキー変更」でAPIキーが正しく入力されているか確認\n・ネットワーク接続を確認\n・使用モデル: ${MODELS[modelIdx]}`;
+    addMsg('ai', msg);
+    openAcc('s2');
+    alert(`エラーが発生しました\n\n${err.message}\n\nAPIキーが正しいか「🔑 APIキー変更」から確認してください。`);
+    setStatus('err', 'エラー');
+    console.error(err);
+  } finally {
+    setBusy(false);
+  }
+}
+
+/* ============================================================
+   CHAT REFINEMENT
+   ============================================================ */
+async function sendChat() {
+  const inp = document.getElementById('chat-in');
+  const msg = inp.value.trim();
+  if (!msg) return;
+
+  addMsg('user', msg);
+  inp.value = '';
+
+  const key = getKey();
+  if (!key) { addMsg('ai', 'APIキーを設定してください'); return; }
+
+  setStatus('busy', '修正中...');
+
+  try {
+    // Build context block
+    const ctx = `現在の原稿内容：\n${FIELDS.map(f => `${f}:\n${S.content[f] || ''}`).join('\n\n')}`;
+
+    const history = [
+      { role:'user',  text: ctx },
+      { role:'model', text: 'わかりました。現在の原稿を確認しました。修正のご要望をどうぞ。' },
+      ...S.chat.slice(-6)  // last 3 exchanges
+    ];
+
+    const out  = await callGemini([{ text: msg }], REFINE_PROMPT, history);
+    S.chat.push({ role:'user', text: msg });
+    S.chat.push({ role:'model', text: out });
+
+    const updates = parseGemini(out);
+    const n = Object.keys(updates).length;
+
+    if (n > 0) {
+      Object.assign(S.content, updates);
+      applyContent();
+      saveS();
+      const display = out.replace(/```[^\n]*\n[\s\S]*?\n```/g, '').trim();
+      addMsg('ai', `✅ ${n}項目を更新しました。\n${display || ''}`);
+      setStatus('ok', `${n}項目 更新完了`);
+    } else {
+      addMsg('ai', out);
+      setStatus('ok', '応答完了');
+    }
+  } catch(err) {
+    addMsg('ai', `❌ ${err.message}`);
+    setStatus('err', 'エラー');
+  }
+}
+
+function addMsg(role, text) {
+  const hist = document.getElementById('chat-hist');
+  const div  = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML  = `<div class="bbl">${esc(text)}</div>`;
+  hist.appendChild(div);
+  hist.scrollTop = hist.scrollHeight;
+}
+
+function esc(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+/* ============================================================
+   ACCORDION & TABS
+   ============================================================ */
+function toggleAcc(hd) {
+  const id = hd.getAttribute('data-acc');
+  const bd = document.getElementById(id);
+  const isOpen = bd.classList.contains('open');
+  bd.classList.toggle('open', !isOpen);
+  hd.classList.toggle('open', !isOpen);
+}
+
+function openAcc(id) {
+  const bd = document.getElementById(id);
+  if (!bd) return;
+  bd.classList.add('open');
+  // find header
+  const hd = bd.previousElementSibling;
+  if (hd) hd.classList.add('open');
+}
+
+function swTab(tab, btn) {
+  document.getElementById('tab-text').style.display  = tab === 'text'  ? 'block' : 'none';
+  document.getElementById('tab-audio').style.display = tab === 'audio' ? 'block' : 'none';
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ============================================================
+   STATUS & BUSY
+   ============================================================ */
+function setStatus(state, text) {
+  document.getElementById('s-dot').className = `dot ${state}`;
+  document.getElementById('s-txt').textContent = text;
+}
+
+function setBusy(v) {
+  const btn  = document.getElementById('btn-gen');
+  const spin = document.getElementById('gen-spin');
+  const txt  = document.getElementById('gen-txt');
+  btn.disabled = v;
+  spin.style.display = v ? 'inline-block' : 'none';
+  txt.textContent = v ? 'AIが執筆中...' : '✨ AI原稿を生成する';
+}
+
+/* ============================================================
+   FILE UTILITY
+   ============================================================ */
+function f2b64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+/* ============================================================
+   PDF EXPORT
+   ============================================================ */
+function exportPDF() {
+  const d   = S.content['header-date'] || '';
+  const safe = d.replace(/[年月\s　]/g,'').replace(/[\\/:*?"<>|]/g,'') || new Date().toISOString().slice(0,7).replace('-','');
+  document.title = `タビオ奈良NEWS_${safe}`;
+  window.print();
+  setTimeout(() => { document.title = 'タビオ奈良NEWS 統合エディタ v8'; }, 3000);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function init() {
+  loadS();
+
+  // API key modal
+  const apiKey = localStorage.getItem(AKEY);
+  if (!apiKey) {
+    document.getElementById('modal').classList.remove('hidden');
+  } else {
+    document.getElementById('modal').classList.add('hidden');
+    document.getElementById('api-key-in').value = apiKey;
+  }
+
+  document.getElementById('btn-save-key').addEventListener('click', () => {
+    const k = document.getElementById('api-key-in').value.trim();
+    if (!k) { alert('APIキーを入力してください'); return; }
+    localStorage.setItem(AKEY, k);
+    document.getElementById('modal').classList.add('hidden');
+  });
+
+  document.getElementById('btn-check-models').addEventListener('click', async () => {
+    const k = document.getElementById('api-key-in').value.trim();
+    if (!k) { alert('先にAPIキーを入力してください'); return; }
+    const div = document.getElementById('model-list');
+    div.style.display = 'block';
+    div.textContent = '確認中...';
+    try {
+      const res  = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${k}`);
+      const data = await res.json();
+      if (data.error) { div.textContent = `エラー: ${data.error.message}`; return; }
+      const names = (data.models || [])
+        .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+        .map(m => m.name.replace('models/',''));
+      if (names.length === 0) { div.textContent = 'generateContent対応モデルが見つかりません'; return; }
+      // Set best available model
+      const preferred = ['gemini-2.5-flash','gemini-2.5-pro','gemini-2.0-flash','gemini-2.0-flash-001'];
+      const best = preferred.find(p => names.includes(p)) || names[0];
+      MODELS[0] = best; modelIdx = 0;
+      div.innerHTML = `✅ 使用モデル: <strong style="color:#4ade80">${best}</strong><br><span style="color:#334155">（対応モデル数: ${names.length}件）</span>`;
+    } catch(e) {
+      div.textContent = `確認失敗: ${e.message}`;
+    }
+  });
+
+  document.getElementById('btn-chg-key').addEventListener('click', () => {
+    document.getElementById('api-key-in').value = getKey();
+    document.getElementById('modal').classList.remove('hidden');
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    if (!confirm('すべての入力内容・写真・設定を初期化します。よろしいですか？')) return;
+    localStorage.removeItem(SKEY);
+    S = {
+      content: JSON.parse(JSON.stringify(DEFAULT_CONTENT)),
+      images: {}, fontSizes: {}, cssVars: {}, chat: [], generated: false
+    };
+    render();
+    document.getElementById('chat-hist').innerHTML =
+      '<p style="color:#334155;font-size:11px;text-align:center;padding:16px 0">①でAI生成すると<br>ここでチャット修正できます</p>';
+    setStatus('idle', '初期化しました');
+  });
+
+  document.getElementById('btn-pdf').addEventListener('click', exportPDF);
+  document.getElementById('btn-gen').addEventListener('click', generate);
+  document.getElementById('btn-chat').addEventListener('click', sendChat);
+  document.getElementById('chat-in').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendChat();
+  });
+
+  render();
+  setStatus('idle', '準備完了');
+
+  // Restore chat history display
+  if (S.chat.length > 0) {
+    for (let i = 0; i < S.chat.length; i += 2) {
+      if (S.chat[i])   addMsg('user', S.chat[i].text);
+      if (S.chat[i+1]) addMsg('ai',   S.chat[i+1].text);
+    }
+    openAcc('s2');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
