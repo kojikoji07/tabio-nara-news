@@ -929,45 +929,58 @@ function showSzPop(el, e) {
   pop.classList.add('vis');
 }
 
-let lastGoodSz = {};  // { elementId: pt } — overflow前の最後のサイズ
+function pageOverflow(page) {
+  if (!page) return 0;
+  // 方法1: overflow一時解除でscrollHeight計測
+  const orig = page.style.overflow;
+  page.style.overflow = 'visible';
+  const diff = page.scrollHeight - page.clientHeight;
+  page.style.overflow = orig || '';
+  if (diff > 2) return diff;
+
+  // 方法2: CSS columns 内のoverflow検出
+  // columns は scrollHeight が正しくないため、single-column化して計測
+  const colsEl = page.querySelector('.cols2');
+  if (colsEl) {
+    colsEl.style.columnCount = '1';
+    const singleH = colsEl.scrollHeight;
+    colsEl.style.columnCount = '';
+    const availH = colsEl.clientHeight * 2;  // 2段分
+    if (singleH > availH) return singleH - availH;
+  }
+
+  return 0;
+}
 
 function onSzChange(v) {
   const pt = parseFloat(v).toFixed(1);
   document.getElementById('sz-val').textContent = pt + 'pt';
   if (!szEl) return;
 
-  // 変更前のサイズを記録
-  const prevPt = S.fontSizes[szEl.id] || parseFloat((parseFloat(window.getComputedStyle(szEl).fontSize) * 0.75).toFixed(1));
-  if (!lastGoodSz[szEl.id]) lastGoodSz[szEl.id] = prevPt;
+  const page = szEl.closest('.page-half');
 
+  // 変更前のoverflow量を記録
+  const overflowBefore = pageOverflow(page);
+
+  // サイズを適用
   szEl.style.fontSize = pt + 'pt';
 
-  const page = szEl.closest('.page-half');
-  // overflow検出
-  let overflowing = false;
-  if (page) {
-    // 通常フロー：scrollHeight チェック
-    if (page.scrollHeight > page.clientHeight + 2) overflowing = true;
-    // 絶対配置内の要素：要素自身がページ境界を超えていないかチェック
-    const pageRect = page.getBoundingClientRect();
-    const elRect = szEl.getBoundingClientRect();
-    if (elRect.bottom > pageRect.bottom + 2 || elRect.top < pageRect.top - 2) overflowing = true;
-  }
-  if (overflowing) {
-    // はみ出した → 前の安全なサイズに戻す
-    const safePt = lastGoodSz[szEl.id];
-    szEl.style.fontSize = safePt + 'pt';
-    document.getElementById('sz-range').value = safePt;
-    document.getElementById('sz-val').textContent = safePt + 'pt';
-    S.fontSizes[szEl.id] = safePt;
+  // 変更後のoverflow量
+  const overflowAfter = pageOverflow(page);
+
+  // 判定: overflowが「新たに発生」or「悪化」した場合のみブロック
+  if (overflowAfter > 2 && overflowAfter > overflowBefore + 1) {
+    // 元のサイズに戻す
+    const prevPt = S.fontSizes[szEl.id] || parseFloat((parseFloat(window.getComputedStyle(szEl).fontSize) * 0.75).toFixed(1));
+    szEl.style.fontSize = prevPt + 'pt';
+    document.getElementById('sz-range').value = prevPt;
+    document.getElementById('sz-val').textContent = prevPt + 'pt';
     setStatus('err', 'これ以上大きくすると用紙からはみ出します');
-    saveS();
     return;
   }
 
   // 問題なし → 保存
   document.querySelectorAll('.page-half.overflow-warn').forEach(p => p.classList.remove('overflow-warn'));
-  lastGoodSz[szEl.id] = parseFloat(pt);
   S.fontSizes[szEl.id] = parseFloat(pt);
   saveS();
 }
@@ -1108,9 +1121,7 @@ function onFieldFontSize(fid, val, labelEl) {
   if (labelEl) labelEl.textContent = pt + 'pt';
   const el = document.getElementById(fid);
   if (!el) return;
-  // overflow チェック付きで適用
   szEl = el;
-  if (!lastGoodSz[fid]) lastGoodSz[fid] = S.fontSizes[fid] || parseFloat((parseFloat(window.getComputedStyle(el).fontSize) * 0.75).toFixed(1));
   onSzChange(parseFloat(pt));
   // スライダーの値も同期（revertされた場合）
   const actualPt = S.fontSizes[fid] || parseFloat(pt);
