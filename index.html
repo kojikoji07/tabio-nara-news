@@ -431,7 +431,7 @@ const FIELDS = [
   'P3_奈良社長_事実','P3_奈良社長_大事','P3_奈良社長_願い','P3_数字',
   'P4_創業者の言葉','P4_創業者の言葉の理解',
   'P4_ありがとう1','P4_ありがとう2','P4_ありがとう3',
-  'P2_推し活','P4_言いにくい','P4_編集後記','P4_予告'
+  'P4_推し活','P4_言いにくい','P4_編集後記','P4_予告'
 ];
 
 const IMG_SLOTS = [
@@ -466,7 +466,7 @@ const PAGE_MAP = [
   },
   { page: 'P2', label: 'P2 特集記事',
     imgs: ['nl-img-p2m','nl-img-p2s'],
-    fields: ['P2_見出し','P2_仕事の肝','P2_BeforeAfter','P2_推し活'],
+    fields: ['P2_見出し','P2_仕事の肝','P2_BeforeAfter'],
     cssVars: [
       {cssVar:'--p2-main-img-h', lbl:'メイン写真の高さ', min:25, max:80, step:2, unit:'mm', def:50},
       {cssVar:'--p2-sub-img-h',  lbl:'サブ写真の高さ',   min:15, max:60, step:2, unit:'mm', def:35},
@@ -479,7 +479,7 @@ const PAGE_MAP = [
   },
   { page: 'P4', label: 'P4 フィロソフィー',
     imgs: ['nl-img-found','nl-img-thx1','nl-img-thx2','nl-img-thx3','nl-img-oshi'],
-    fields: ['P4_創業者の言葉','P4_創業者の言葉の理解','P4_ありがとう1','P4_ありがとう2','P4_ありがとう3','P4_言いにくい','P4_編集後記','P4_予告'],
+    fields: ['P4_創業者の言葉','P4_創業者の言葉の理解','P4_ありがとう1','P4_ありがとう2','P4_ありがとう3','P4_推し活','P4_言いにくい','P4_編集後記','P4_予告'],
     cssVars: [
       {cssVar:'--p4-founder-img-h', lbl:'創業者写真の高さ', min:25, max:75, step:2, unit:'mm', def:45},
       {cssVar:'--oshikatsu-size',    lbl:'推し活写真のサイズ', min:14, max:40, step:2, unit:'mm', def:24},
@@ -502,26 +502,26 @@ const GEN_PROMPT = `【役割】
 
 【必須出力項目と制約】
 header-date: 発行年月（例：2026年5月）
-P1_タイトル: 全体を象徴するメインタイトル
-P1_サマリー1: 【動き】150文字以内
-P1_サマリー2: 【変化】150文字以内
-P1_サマリー3: 【挑戦】150文字以内
+P1_タイトル: 素材全体を通して最も象徴的なメインタイトル
+P1_サマリー1: 【動き】P3の越智社長・真砂社長のメッセージから「動き」を抽出。150文字以内
+P1_サマリー2: 【変化】P3の越智社長・真砂社長のメッセージから「変化」を抽出。150文字以内
+P1_サマリー3: 【挑戦】P3の越智社長・真砂社長のメッセージから「挑戦」を抽出。150文字以内
 P2_見出し: 現場の誇りを感じさせるキャッチーな見出し
 P2_仕事の肝: 900〜1100文字。現場の誇りをテーマに執筆
-P2_BeforeAfter: 改善前後を比較、200文字以内
+P2_BeforeAfter: P2_仕事の肝の内容から「何がどう変わったか」を中心に200文字以内で生成。変化が見当たらない場合は、仕事の肝に対するAIとしての総括を記載
 P3_トピック1: 越智社長【序】200文字
 P3_トピック2: 越智社長【破】200文字
 P3_トピック3: 越智社長【急】200文字
 P3_奈良社長_事実: 真砂社長【動き・事実】200文字
 P3_奈良社長_大事: 真砂社長【大切な哲学】200文字
 P3_奈良社長_願い: 真砂社長【社員への願い】200文字
-P3_数字: 象徴的な数字とその意味（1行）
+P3_数字: KPI・物流・靴下産業に関わる象徴的な数字とその意味（1行）
 P4_創業者の言葉: 格言のみ（1行）
 P4_創業者の言葉の理解: 格言の現代的解釈200〜300文字
 P4_ありがとう1: 感謝メッセージ①（相手の名前から始める）
 P4_ありがとう2: 感謝メッセージ②
 P4_ありがとう3: 感謝メッセージ③
-P2_推し活: 社員の趣味・リフレッシュ紹介200〜300文字
+P4_推し活: 社員の趣味・リフレッシュ紹介200〜300文字
 P4_言いにくい: 現場のちょっとした本音（1行）
 P4_編集後記: 今月のテーマに沿った気づき100文字程度
 P4_予告: 次号予告
@@ -560,8 +560,52 @@ function loadS() {
   } catch(e) {}
 }
 function saveS() {
-  try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch(e) {}
-  showAutoSaved();
+  try {
+    localStorage.setItem(SKEY, JSON.stringify(S));
+    showAutoSaved();
+  } catch(e) {
+    // localStorage容量超過 → 画像を圧縮してリトライ
+    console.warn('localStorage save failed, compressing images...', e.message);
+    compressAllImages().then(() => {
+      try {
+        localStorage.setItem(SKEY, JSON.stringify(S));
+        showAutoSaved();
+      } catch(e2) {
+        setStatus('err', '保存失敗: データが大きすぎます。写真を減らしてください');
+        console.error('Save failed after compression:', e2.message);
+      }
+    });
+  }
+}
+
+async function compressAllImages() {
+  for (const id of Object.keys(S.images)) {
+    if (!S.images[id]) continue;
+    try {
+      S.images[id] = await compressImage(S.images[id], 800, 0.6);
+    } catch(e) { /* skip */ }
+  }
+}
+
+function compressImage(dataUrl, maxSize, quality) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        const ratio = Math.min(maxSize / w, maxSize / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 }
 
 function showAutoSaved() {
@@ -680,7 +724,7 @@ function nlHTML() {
           <div id="nl-img-oshi" class="nl-img"
             style="width:var(--oshikatsu-size);height:var(--oshikatsu-size);border-radius:2mm;flex-shrink:0"
             onclick="pickImg('nl-img-oshi')"></div>
-          <div id="P2_推し活" class="nle"
+          <div id="P4_推し活" class="nle"
             contenteditable="true" onclick="showSzPop(this,event)"
             style="font-size:var(--p4-font-size);font-style:italic;line-height:1.7;flex-grow:1;overflow:hidden"></div>
         </div>
@@ -789,6 +833,9 @@ function nlHTML() {
       </div>
       <!-- HQ Strategy -->
       <div style="display:flex;gap:3mm;align-items:flex-start;padding:3mm;background:#f8fafc;border-left:4px solid var(--color-main);box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:3mm;flex-shrink:0">
+        <div id="nl-img-ochi" class="nl-img nl-round"
+          style="width:var(--icon-size);height:var(--icon-size);flex-shrink:0"
+          onclick="pickImg('nl-img-ochi')"></div>
         <div style="flex-grow:1;min-width:0">
           <div style="font-size:6.5pt;font-weight:900;color:#94a3b8;text-transform:uppercase;font-family:'Noto Sans JP',sans-serif;margin-bottom:1.5mm">HQ Strategy</div>
           ${[1,2,3].map(i => `
@@ -796,12 +843,12 @@ function nlHTML() {
             contenteditable="true" onclick="showSzPop(this,event)"
             style="font-size:var(--p3-font-size);font-weight:700;line-height:1.7;margin-bottom:1.5mm"></div>`).join('')}
         </div>
-        <div id="nl-img-ochi" class="nl-img nl-round"
-          style="width:var(--icon-size);height:var(--icon-size);flex-shrink:0"
-          onclick="pickImg('nl-img-ochi')"></div>
       </div>
       <!-- Presidential Message -->
       <div style="display:flex;gap:3mm;align-items:flex-start;background:var(--color-main);color:white;padding:4mm;border-radius:3mm;box-shadow:0 2px 10px rgba(0,0,0,.2);flex-grow:1;overflow:hidden">
+        <div id="nl-img-masago" class="nl-img nl-round"
+          style="width:var(--icon-size);height:var(--icon-size);flex-shrink:0"
+          onclick="pickImg('nl-img-masago')"></div>
         <div style="flex-grow:1;min-width:0;display:flex;flex-direction:column;gap:2mm;overflow:hidden">
           <div style="font-size:6.5pt;font-weight:900;color:#4b6080;text-transform:uppercase;font-family:'Noto Sans JP',sans-serif">Presidential Message</div>
           ${[
@@ -816,9 +863,6 @@ function nlHTML() {
               style="font-size:var(--p3-font-size);line-height:1.65;color:${bg};${extra}"></div>
           </div>`).join('')}
         </div>
-        <div id="nl-img-masago" class="nl-img nl-round"
-          style="width:var(--icon-size);height:var(--icon-size);flex-shrink:0"
-          onclick="pickImg('nl-img-masago')"></div>
       </div>
       <!-- KPI -->
       <div style="text-align:center;padding:3.5mm;border:3px double #dde3ed;border-radius:2mm;flex-shrink:0;margin-top:3mm">
@@ -1010,10 +1054,12 @@ document.getElementById('img-input').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file || !picTarget) return;
   const reader = new FileReader();
-  reader.onload = ev => {
-    S.images[picTarget] = ev.target.result;
+  reader.onload = async ev => {
+    // アップロード時に圧縮（localStorage容量対策）
+    const compressed = await compressImage(ev.target.result, 1200, 0.7);
+    S.images[picTarget] = compressed;
     const slot = document.getElementById(picTarget);
-    if (slot) slot.innerHTML = `<img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+    if (slot) slot.innerHTML = `<img src="${compressed}" style="width:100%;height:100%;object-fit:cover">`;
     saveS();
     renderPagePanels();
   };
